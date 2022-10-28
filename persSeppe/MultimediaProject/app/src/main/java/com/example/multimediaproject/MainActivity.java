@@ -4,67 +4,51 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.annotation.NonNull;
 
-import android.content.IntentSender;
-
 
 import android.Manifest;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Looper;
 import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
-import android.widget.Switch;
 import android.widget.TextView;
-
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
-import com.android.volley.RequestQueue;
-import com.android.volley.Request;
-import com.android.volley.toolbox.JsonObjectRequest;
-import com.android.volley.toolbox.Volley;
 
 import android.util.Log;
 
-import org.json.JSONObject;
-
-import android.location.LocationManager;
 import android.widget.Toast;
 
-import com.google.android.gms.common.api.ApiException;
-import com.google.android.gms.common.api.ResolvableApiException;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.LocationSettingsRequest;
-import com.google.android.gms.location.LocationSettingsResponse;
-import com.google.android.gms.location.LocationSettingsStatusCodes;
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 
 
 public class MainActivity extends AppCompatActivity {
+    // Macros
     public static final int DEFAULT_UPDATE_INTERVAL = 30;
     public static final int FAST_UPDATE_INTERVAL = 5;
     private static final int PERMISSION_FINE_lOCATION = 99;
     private static final int DISTANCE_RADIUS = 500;
+    private static final DecimalFormat df = new DecimalFormat("0.00");
 
     // UI elements
-    TextView textGPS;
+    TextView textField;
+    Button btnControleSubmit;
+    AutoCompleteTextView controleStationInput;
 
     //---Location Stuff:---//
     // Config file for all settings related to FusedLocationProviderContent
@@ -74,21 +58,36 @@ public class MainActivity extends AppCompatActivity {
     // Necessary for a function
     LocationCallback locationCallBack;
 
-    // Station vars
+    // Lists
     private List<StationSample> stationData = new ArrayList<>();
     private List<NearbyStations> nearbyStations = new ArrayList<>();
+    private List<String> controlStations = new ArrayList<>();
+
+    // Arrays
+    private String[] autoCompleteStations;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // UI elements
-        textGPS = findViewById(R.id.textGPS);
-
         // Read CSV file
         readStationData();
 
+        //---UI elements---//
+        textField = findViewById(R.id.textField);
+        btnControleSubmit = findViewById(R.id.btnControleSubmit);
+
+        // Auto Complete Text View
+        controleStationInput = findViewById(R.id.TextViewControlStation);
+        autoCompleteStations = new String[stationData.size()];
+        getStationStringList();
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_list_item_1, autoCompleteStations);
+        controleStationInput.setAdapter(adapter);
+
+        //---Location---//
         // set all properties of LocationRequest
         locationRequest = new LocationRequest();
         locationRequest.setInterval(1000 * DEFAULT_UPDATE_INTERVAL);
@@ -113,6 +112,15 @@ public class MainActivity extends AppCompatActivity {
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
         startLocationUpdates();
         updateGPS();
+
+        //---UI Listeners---//
+        btnControleSubmit.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String stationName = controleStationInput.getText().toString();
+                controlStations.add(stationName);
+            }
+        });
 
 
     } // end Oncreate
@@ -173,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
     // Update the UI
     private void updateUI(Location location) {
         // update text view with new location
-        textGPS.setText(String.valueOf(location.getLatitude()) + "\n" + String.valueOf(location.getLongitude()));
+        //textField.setText(String.valueOf(location.getLatitude()) + "\n" + String.valueOf(location.getLongitude()));
     }
 
     // Read CSV file and put into a list of created object
@@ -209,6 +217,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // Check the nearby stations -> adds them to the corresponding list
     private  void checkNearbyStations(Location currentLocation){
         // First clear previous List
         nearbyStations.clear();
@@ -218,11 +227,11 @@ public class MainActivity extends AppCompatActivity {
             Location stationLocation = new Location(stationData.get(i).getStation());
             stationLocation.setLatitude(stationData.get(i).getLatitude());
             stationLocation.setLongitude(stationData.get(i).getLongitude());
-            currentLocation.setLatitude(50.824232);
-            currentLocation.setLongitude(4.396758);
+            currentLocation.setLatitude(50.824232); // test location
+            currentLocation.setLongitude(4.396758); // test location
             // Calculate distance
             double distance = currentLocation.distanceTo(stationLocation);
-            Log.d("MyActivity", "Distance:" + distance);
+            //Log.d("MyActivity", "Distance:" + distance);
             // Check if distance is in radius (m)
             if (distance < DISTANCE_RADIUS) {
                 // Create nearbyStation object
@@ -233,8 +242,16 @@ public class MainActivity extends AppCompatActivity {
                 nearbyStation.setDistance(distance);
                 // Add it to the list
                 nearbyStations.add(nearbyStation);
-                Log.d("MyActivity", "Just created:" + nearbyStation.toString());
+                textField.setText("\nStation Name: " + nearbyStation.getStation() + ", " + "Distance: "+ df.format(nearbyStation.getDistance()) + "m") ;
+                //Log.d("MyActivity", "Just created:" + nearbyStation.toString());
             }
+        }
+    }
+
+    // Create the drop down list from the stations in the CSV file
+    private void getStationStringList(){
+        for (int i = 0; i < stationData.size(); i++){
+            autoCompleteStations[i] = stationData.get(i).getStation();
         }
     }
 }
