@@ -1,4 +1,4 @@
-package com.example.mivb_controlfe;
+package com.example.frontend;
 
 import org.junit.Test;
 

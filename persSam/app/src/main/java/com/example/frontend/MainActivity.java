@@ -1,6 +1,7 @@
-package com.example.mivb_controlfe;
+package com.example.frontend;
 
 import androidx.appcompat.app.AppCompatActivity;
+
 import android.os.Bundle;
 
 public class MainActivity extends AppCompatActivity {
