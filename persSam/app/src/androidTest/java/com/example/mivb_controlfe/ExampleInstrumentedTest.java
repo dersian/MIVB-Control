@@ -1,4 +1,4 @@
-package com.example.frontend;
+package com.example.mivb_controlfe;
 
 import android.content.Context;
 
@@ -21,6 +21,6 @@ public class ExampleInstrumentedTest {
     public void useAppContext() {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        assertEquals("com.example.frontend", appContext.getPackageName());
+        assertEquals("com.example.mivb_controlfe", appContext.getPackageName());
     }
 }
