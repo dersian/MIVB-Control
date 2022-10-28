@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "MIVB-Control FE"
+rootProject.name = "EndFront"
 include ':app'
