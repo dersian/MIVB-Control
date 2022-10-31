@@ -43,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
     public static final int FAST_UPDATE_INTERVAL = 5;
     private static final int PERMISSION_FINE_lOCATION = 99;
     private static final int DISTANCE_RADIUS = 500;
+    private static final int CONTROL_RADIUS = 500;
     private static final DecimalFormat df = new DecimalFormat("0.00");
 
     // UI elements
@@ -71,6 +72,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        View rootView = findViewById(android.R.id.content);
 
         // Read CSV file
         readStationData();
@@ -119,9 +121,13 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 String stationName = controleStationInput.getText().toString();
                 controlStations.add(stationName);
+                Log.d("MyActivity", "Added to control stations:" + stationName);
+                Log.d("MyActivity", "Check control station list" + controlStations.get(0));
             }
         });
 
+        // Om de x seconden uitvoeren
+        askForControl(rootView);
 
     } // end Oncreate
 
@@ -227,8 +233,8 @@ public class MainActivity extends AppCompatActivity {
             Location stationLocation = new Location(stationData.get(i).getStation());
             stationLocation.setLatitude(stationData.get(i).getLatitude());
             stationLocation.setLongitude(stationData.get(i).getLongitude());
-            currentLocation.setLatitude(50.824232); // test location
-            currentLocation.setLongitude(4.396758); // test location
+            currentLocation.setLatitude(50.837398); // test location
+            currentLocation.setLongitude(4.407608); // test location
             // Calculate distance
             double distance = currentLocation.distanceTo(stationLocation);
             //Log.d("MyActivity", "Distance:" + distance);
@@ -252,6 +258,36 @@ public class MainActivity extends AppCompatActivity {
     private void getStationStringList(){
         for (int i = 0; i < stationData.size(); i++){
             autoCompleteStations[i] = stationData.get(i).getStation();
+        }
+    }
+
+    // Check if user is within close proximity from a station and ask if there is a control
+    private void askForControl(View view){
+        Log.d("MyActivity", "Popping window");
+        Log.d("MyActivity", "Size: " + nearbyStations.size());
+        for(int i = 0; i < nearbyStations.size(); i++){
+            Log.d("MyActivity", "Distance: " + nearbyStations.get(i).getDistance());
+            if(nearbyStations.get(i).getDistance() <= CONTROL_RADIUS){
+                Log.d("MyActivity", "Within Control Radius");
+                boolean check;
+                // Create and Show Pop Up Class
+                PopUpClass controlPopUp = new PopUpClass();
+                controlPopUp.setStationName(nearbyStations.get(i).getStation());
+                controlPopUp.showPopupWindow(view);
+                check = controlPopUp.isControlCheck();
+                // if station is nearby and not in control list -> skip
+                // if station is nearby and in control list -> check if it has to be removed or not
+                Log.d("MyActivity", "Check: " + check);
+                if (controlStations.contains(nearbyStations.get(i).getStation())){
+                    if (check == false){
+                        // Remove from controlStations List
+                        controlStations.remove(nearbyStations.get(i).getStation());
+                        Log.d("MyActivity", "Removed from control stations" + nearbyStations.get(i).getStation());
+                        //Log.d("MyActivity", "Check control station list: " + controlStations.get(0));
+                    }
+                    // check is true -> keep in list
+                }
+            }
         }
     }
 }
