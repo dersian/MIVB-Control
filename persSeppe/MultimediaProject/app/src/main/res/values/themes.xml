@@ -13,4 +13,12 @@
         <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
         <!-- Customize your theme here. -->
     </style>
+
+    <style name="PopUpWindowTheme" parent="Theme.Design.BottomSheetDialog">
+        <item name="popupWindowStyle">@style/Theme.Design.BottomSheetDialog</item>
+    </style>
+
+    <style name="PopUpWindowStyle" parent="Widget.Design.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+    </style>
 </resources>

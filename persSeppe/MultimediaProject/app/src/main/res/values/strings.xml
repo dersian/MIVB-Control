@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Multimedia Project</string>
+    <string name="are_there_any_controls_at_these_nearby_stations">Are there any controls at these nearby stations?</string>
 </resources>

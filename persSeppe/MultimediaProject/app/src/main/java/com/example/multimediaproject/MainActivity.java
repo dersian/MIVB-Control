@@ -10,10 +10,13 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import android.util.Log;
@@ -26,6 +29,7 @@ import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -49,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
     // UI elements
     TextView textField;
     Button btnControleSubmit;
+    Button btnControl;
     AutoCompleteTextView controleStationInput;
 
     //---Location Stuff:---//
@@ -60,12 +65,22 @@ public class MainActivity extends AppCompatActivity {
     LocationCallback locationCallBack;
 
     // Lists
-    private List<StationSample> stationData = new ArrayList<>();
-    private List<NearbyStations> nearbyStations = new ArrayList<>();
-    private List<String> controlStations = new ArrayList<>();
+    private List<StationSample> stationData = new ArrayList<>(); // list with the CSV stops data
+    private List<NearbyStations> nearbyStations = new ArrayList<>(); // list with the nearby stations -> see DISTANCE_RADIUS
+    private List<String> controlStationsCurrent = new ArrayList<>(); // list with the stations where a control is happening (current controls)
+    private List<String> controlStationsToCheck = new ArrayList<>(); // list with the nearby stations that have to be checked if there is a control -> see CONTROL_RADIUS
 
     // Arrays
     private String[] autoCompleteStations;
+
+    // List Views and Adapters
+    // Nearby Stations
+    private ListView nearbyStationsListView;
+    private NearbyStationsAdapter nearbyStationsAdapter;
+    // Current Controls
+    // Controls To Check -> Pop Up Window
+    private ListView controlsToCheckListView;
+    private ControlStationsAdapter controlsToCheckAdapter;
 
 
     @Override
@@ -78,8 +93,8 @@ public class MainActivity extends AppCompatActivity {
         readStationData();
 
         //---UI elements---//
-        textField = findViewById(R.id.textField);
         btnControleSubmit = findViewById(R.id.btnControleSubmit);
+        btnControl = findViewById(R.id.btnControls);
 
         // Auto Complete Text View
         controleStationInput = findViewById(R.id.TextViewControlStation);
@@ -115,19 +130,44 @@ public class MainActivity extends AppCompatActivity {
         startLocationUpdates();
         updateGPS();
 
+
         //---UI Listeners---//
         btnControleSubmit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 String stationName = controleStationInput.getText().toString();
-                controlStations.add(stationName);
-                Log.d("MyActivity", "Added to control stations:" + stationName);
-                Log.d("MyActivity", "Check control station list" + controlStations.get(0));
+                controlStationsCurrent.add(stationName);
+                Log.d("MyActivity", "Added to control stations: " + stationName);
+                Log.d("MyActivity", "Check control station list " + controlStationsCurrent.get(0));
+            }
+        });
+        btnControl.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Log.d("MyActivity", "Checking controls at nearby stations");
+                // Check the nearby stations that have to be controlled
+                checkNearbyControlStations();
+                // Launch pop up window
+                BottomSheetDialog popUpControlDialog = new BottomSheetDialog(
+                        MainActivity.this, R.style.PopUpWindowTheme
+                );
+
+                View popUpControlView = LayoutInflater.from(getApplicationContext())
+                        .inflate(
+                                R.layout.popupcontrol_window,
+                                (LinearLayout)findViewById(R.id.popUpControlWindow)
+                        );
+
+                popUpControlDialog.setContentView(popUpControlView);
+                popUpControlDialog.show();
+
+                controlsToCheckListView = (ListView) popUpControlView.findViewById(R.id.listViewControlsToCheck);
+                controlsToCheckAdapter = new ControlStationsAdapter(getApplicationContext(), controlStationsToCheck, controlStationsCurrent);
+                controlsToCheckListView.setAdapter(controlsToCheckAdapter);
+                printStringList(controlStationsCurrent);
             }
         });
 
-        // Om de x seconden uitvoeren
-        askForControl(rootView);
 
     } // end Oncreate
 
@@ -186,8 +226,15 @@ public class MainActivity extends AppCompatActivity {
 
     // Update the UI
     private void updateUI(Location location) {
-        // update text view with new location
-        //textField.setText(String.valueOf(location.getLatitude()) + "\n" + String.valueOf(location.getLongitude()));
+        // Update List Views
+        printNearbyStationList();
+
+        // Set List Views
+        Log.d("MyActivity", "Setting Nearby Station List View...");
+        nearbyStationsListView = (ListView) findViewById(R.id.listViewNearbyStations);
+        nearbyStationsAdapter = new NearbyStationsAdapter(this, nearbyStations);
+        nearbyStationsListView.setAdapter(nearbyStationsAdapter);
+        nearbyStationsAdapter.notifyDataSetChanged();
     }
 
     // Read CSV file and put into a list of created object
@@ -224,7 +271,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // Check the nearby stations -> adds them to the corresponding list
-    private  void checkNearbyStations(Location currentLocation){
+    private void checkNearbyStations(Location currentLocation){
         // First clear previous List
         nearbyStations.clear();
         // Loop over List with station objects
@@ -248,8 +295,8 @@ public class MainActivity extends AppCompatActivity {
                 nearbyStation.setDistance(distance);
                 // Add it to the list
                 nearbyStations.add(nearbyStation);
-                textField.setText("\nStation Name: " + nearbyStation.getStation() + ", " + "Distance: "+ df.format(nearbyStation.getDistance()) + "m") ;
-                //Log.d("MyActivity", "Just created:" + nearbyStation.toString());
+                //textField.setText("\nStation Name: " + nearbyStation.getStation() + ", " + "Distance: "+ df.format(nearbyStation.getDistance()) + "m") ;
+                Log.d("MyActivity", "Just added station: " + nearbyStation.toString());
             }
         }
     }
@@ -261,33 +308,32 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Check if user is within close proximity from a station and ask if there is a control
-    private void askForControl(View view){
-        Log.d("MyActivity", "Popping window");
+    // Check if user is within close proximity from a station and ask if there is a control -> pop up window
+    private void checkNearbyControlStations(){
+        controlStationsToCheck.clear();
         Log.d("MyActivity", "Size: " + nearbyStations.size());
         for(int i = 0; i < nearbyStations.size(); i++){
             Log.d("MyActivity", "Distance: " + nearbyStations.get(i).getDistance());
             if(nearbyStations.get(i).getDistance() <= CONTROL_RADIUS){
-                Log.d("MyActivity", "Within Control Radius");
-                boolean check;
-                // Create and Show Pop Up Class
-                PopUpClass controlPopUp = new PopUpClass();
-                controlPopUp.setStationName(nearbyStations.get(i).getStation());
-                controlPopUp.showPopupWindow(view);
-                check = controlPopUp.isControlCheck();
-                // if station is nearby and not in control list -> skip
-                // if station is nearby and in control list -> check if it has to be removed or not
-                Log.d("MyActivity", "Check: " + check);
-                if (controlStations.contains(nearbyStations.get(i).getStation())){
-                    if (check == false){
-                        // Remove from controlStations List
-                        controlStations.remove(nearbyStations.get(i).getStation());
-                        Log.d("MyActivity", "Removed from control stations" + nearbyStations.get(i).getStation());
-                        //Log.d("MyActivity", "Check control station list: " + controlStations.get(0));
-                    }
-                    // check is true -> keep in list
-                }
+                Log.d("MyActivity", "Within Control Radius: " + nearbyStations.get(i).getStation());
+                // add it to the nearby control stations list to be checked
+                controlStationsToCheck.add(nearbyStations.get(i).getStation());
             }
+        }
+    }
+
+    // --- Debug Functions --- //
+    private void printNearbyStationList(){
+        Log.d("MyActivity", "Printing nearby stations... ");
+        for (int i = 0; i < nearbyStations.size(); i++){
+            Log.d("MyActivity", "In nearby stations list: " + nearbyStations.get(i).getStation());
+        }
+    }
+
+    private void printStringList(List<String> stationList){
+        Log.d("MyActivity", "Printing String List... ");
+        for (int i = 0; i < stationList.size(); i++){
+            Log.d("MyActivity", "Station in List: " + stationList.get(i));
         }
     }
 }
